@@ -1,104 +1,133 @@
 const fs = require("fs-extra");
+const axios = require("axios");
 const path = require("path");
+const { getPrefix } = global.utils;
+const { commands, aliases } = global.GoatBot;
 
 module.exports = {
-	config: {
-		name: "help",
-		aliases: ["menu", "commands"],
-		version: "4.8",
-		author: "NeoKEX",
-		shortDescription: "Show all available commands",
-		longDescription: "Displays a clean and premium-styled categorized list of commands.",
-		category: "system",
-		guide: "{pn}help [command name]"
-	},
+  config: {
+    name: "help",
+    version: "2.0",
+    author: "Eden",
+    countDown: 5,
+    role: 0,
+    shortDescription: { en: "help menu" },
+    longDescription: { en: "View the list of commands or detailed info" },
+    category: "System",
+    guide: { en: "{pn} / help <command>" },
+    priority: 1,
+  },
 
-	onStart: async function ({ message, args, prefix }) {
-		const allCommands = global.GoatBot.commands;
-		const categories = {};
+  onStart: async function ({ message, args, event, role }) {
+    const prefix = getPrefix(event.threadID);
 
-		const emojiMap = {
-			ai: "➥", "ai-image": "➥", group: "➥", system: "➥",
-			fun: "➥", owner: "➥", config: "➥", economy: "➥",
-			media: "➥", "18+": "➥", tools: "➥", utility: "➥",
-			info: "➥", image: "➥", game: "➥", admin: "➥",
-			rank: "➥", boxchat: "➥", others: "➥"
-		};
+    const cyberImages = [
+      "https://i.postimg.cc/6pcnfXvT/Messenger-creation-1364262568824299.webp",
+      "https://i.postimg.cc/26hvDnsS/efa10dcb488c629e415c16c0e9bf65aa.jpg",
+      "https://i.postimg.cc/GhZMPjb6/received-4160564894262583.jpg"
+    ];
 
-		const cleanCategoryName = (text) => {
-			if (!text) return "others";
-			return text
-				.normalize("NFKD")
-				.replace(/[^\w\s-]/g, "")
-				.replace(/\s+/g, " ")
-				.trim()
-				.toLowerCase();
-		};
+    const randomBG = cyberImages[Math.floor(Math.random() * cyberImages.length)];
 
-		for (const [name, cmd] of allCommands) {
-			const cat = cleanCategoryName(cmd.config.category);
-			if (!categories[cat]) categories[cat] = [];
-			categories[cat].push(cmd.config.name);
-		}
+    // MAIN HELP LIST
+    if (args.length === 0) {
+      const categories = {};
+      let msg = "";
 
+      msg += ` ⟪♠️ZEPHYRION HELP MENU⟫ \n\n`;
 
-		if (args[0]) {
-			const query = args[0].toLowerCase();
-			const cmd =
-				allCommands.get(query) ||
-				[...allCommands.values()].find((c) => (c.config.aliases || []).includes(query));
-			if (!cmd) return message.reply(`❌ Command "${query}" not found.`);
+      for (const [name, value] of commands) {
+        if (value.config.role > 1 && role < value.config.role) continue;
 
-			const {
-				name,
-				version,
-				author,
-				guide,
-				category,
-				shortDescription,
-				longDescription,
-				aliases,
-				role 
-			} = cmd.config;
+        const category = value.config.category || "Uncategorized";
+        if (!categories[category]) categories[category] = [];
+        categories[category].push(name);
+      }
 
-			const desc =
-				typeof longDescription === "string"
-					? longDescription
-					: longDescription?.en || shortDescription?.en || shortDescription || "No description";
+      for (const category in categories) {
+        msg += `\n          ⟬ ${category.toUpperCase()} ⟭\n`;
+        msg += `⧉━━━━━━━━━━━━⧉\n`;
 
-			const usage =
-				typeof guide === "string"
-					? guide.replace(/{pn}/g, prefix)
-					: guide?.en?.replace(/{pn}/g, prefix) || `${prefix}${name}`;
+        const sorted = categories[category].sort();
 
-						const requiredRole = cmd.config.role !== undefined ? cmd.config.role : 0; 
+        // 🔥 TWO-COLUMN STYLE (only update you asked for)
+        for (let i = 0; i < sorted.length; i += 2) {
+          const left = `◈ ${sorted[i]}`;
+          const right = sorted[i + 1] ? `◈ ${sorted[i + 1]}` : "";
+          msg += `${left.padEnd(18)} ${right}\n`;
+        }
+      }
 
-			return message.reply(
-				`☠️ 𝗖𝗢𝗠𝗠𝗔𝗡𝗗 𝗜𝗡𝗙𝗢 ☠️\n\n` +
-				`➥ Name: ${name}\n` +
-				`➥ Category: ${category || "Uncategorized"}\n` +
-				`➥ Description: ${desc}\n` +
-				`➥ Aliases: ${aliases?.length ? aliases.join(", ") : "None"}\n` +
-				`➥ Usage: ${usage}\n` +
-				`➥ Permission: ${requiredRole}\n` + 
-				`➥ Author: ${author}\n` +
-				`➥ Version: ${version}`
-			);
-		}
+      msg += `
+⧉━━━━━━━━━━━━⧉
+⚙ Total Commands: ${commands.size}
+🎛 Prefix: ${prefix}
+📘 Usage: ${prefix}help <cmd>
+🚩 Bot Owner: 𝐄𝐝𝐞𝐧 愛
+🏴 Owner Inbox: DIMU NA KI KORBI KOR
+⧉━━━━━━━━━━━━⧉`;
 
-		const formatCommands = (cmds) =>
-			cmds.sort().map((cmd) => `× ${cmd}`);
+      try {
+        const imgPath = path.join(__dirname, "cyber_help.jpg");
+        const imgData = (await axios.get(randomBG, { responseType: "arraybuffer" })).data;
+        fs.writeFileSync(imgPath, Buffer.from(imgData, "binary"));
+        await message.reply({ body: msg, attachment: fs.createReadStream(imgPath) });
+        fs.unlinkSync(imgPath);
+      } catch (e) {
+        await message.reply(msg);
+      }
 
-		let msg = `━━━☠️ 𝗡𝗲𝗼𝗞𝗘𝗫 𝗔𝗜 ☠️━━━\n`;
-		const sortedCategories = Object.keys(categories).sort();
-		for (const cat of sortedCategories) {
-			const emoji = emojiMap[cat] || "➥";
-			msg += `\n╭──『 ${cat.toUpperCase()} 』\n`; 
-			msg += `${formatCommands(categories[cat]).join(' ')}\n`; 
-			msg += `╰────────────◊\n`;
-		}
-		msg += `\n➥ Use: ${prefix}help [command name] for details\n➥Use: ${prefix}callad to talk with bot admins '_'`;
+      return;
+    }
 
-		return message.reply(msg);
-	}
+    // COMMAND INFO
+    const name = args[0].toLowerCase();
+    const cmd = commands.get(name) || commands.get(aliases.get(name));
+
+    if (!cmd) return message.reply(`❌ No command named "${name}" found.`);
+
+    const conf = cmd.config;
+
+    const category = conf.category || "Unknown";
+    const desc = conf.longDescription?.en || "No description available.";
+    const aliasList = conf.aliases?.length ? conf.aliases.join(", ") : "None";
+    const roleText =
+      conf.role == 0 ? "User" :
+      conf.role == 1 ? "Admin" :
+      conf.role == 2 ? "Super Admin" : "Unknown";
+
+    const cooldown = conf.countDown || 0;
+    const money = conf.money || 0;
+    const premium = conf.isPremium ? "Yes" : "No";
+    const author = conf.author || "Unknown";
+
+    const usage =
+      conf.guide?.en?.replace(/{p}/g, prefix).replace(/{n}/g, conf.name) ||
+      "No usage guide available.";
+
+    const infoMsg = `
+ZEPHYRION COMMAND INFO🎏
+
+🟣 COMMAND ID → ${conf.name}
+🔻 CATEGORY → ${category}
+🔻 DESC → ${desc}
+
+♠️ STATUS PANEL
+   I–ᐉ Aliases: ${aliasList}
+   I–ᐉ Version: ${conf.version || "1.0"}
+   I–ᐉ Permission: ${roleText}
+   I–ᐉ Cooldown: ${cooldown}s
+   I–ᐉ Money Required: $${money}
+   I–ᐉ Premium: ${premium}
+
+👤 AUTHOR → ${author}
+
+📘 USAGE 
+${usage}
+
+✦••┈┈┈┈┈┈┈┈┈┈┈┈••✦
+`;
+
+    return message.reply(infoMsg);
+  }
 };
